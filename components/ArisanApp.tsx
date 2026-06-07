@@ -288,6 +288,7 @@ export function ArisanApp({ initialParticipants, initialCountries, drawStartAt }
   const [spinning, setSpinning] = useState(false)
   const [toast, setToast] = useState<ToastState>(null)
   const rotationRef = useRef(0)
+  const spinLockRef = useRef(false)
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevParticipantsRef = useRef<Participant[]>(initialParticipants)
 
@@ -386,7 +387,11 @@ export function ArisanApp({ initialParticipants, initialCountries, drawStartAt }
   }
 
   async function doSpin() {
-    if (spinning || spinPool.length === 0 || !activeId || !active) return
+    // Guard with a ref (not just `spinning` state) so a rapid double-click
+    // can't slip through before setSpinning(true) has actually committed —
+    // state updates are async, refs are not.
+    if (spinLockRef.current || spinning || spinPool.length === 0 || !activeId || !active) return
+    spinLockRef.current = true
 
     const n = spinPool.length
     const seg = 360 / n
@@ -397,7 +402,11 @@ export function ArisanApp({ initialParticipants, initialCountries, drawStartAt }
       body: JSON.stringify({ participantId: activeId }),
     })
     const data = await res.json()
-    if (!res.ok) { alert(data.error || 'Terjadi kesalahan'); return }
+    if (!res.ok) {
+      spinLockRef.current = false
+      alert(data.error || 'Terjadi kesalahan')
+      return
+    }
 
     const winner: Country = data.country
     const practice: boolean = !!data.practice
@@ -430,6 +439,7 @@ export function ArisanApp({ initialParticipants, initialCountries, drawStartAt }
       Sound.playWin()
       setWin({ participant: active, country: winner, practice })
       setSpinning(false)
+      spinLockRef.current = false
       // Mode latihan: tidak ada apa pun yang disimpan di server, jadi tidak
       // perlu (dan tidak boleh) memanggil endpoint finish.
       if (!practice) {
