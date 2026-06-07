@@ -6,8 +6,9 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('participants')
-    .select(`*, country:countries!country_id(*)`)
+    .select(`*, countries:countries!assigned_participant_id(*)`)
     .order('created_at', { ascending: true })
+    .order('assigned_at', { referencedTable: 'countries', ascending: true })
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
   const { data, error } = await supabase
     .from('participants')
     .insert({ name: name.trim() })
-    .select(`*, country:countries!country_id(*)`)
+    .select(`*, countries:countries!assigned_participant_id(*)`)
     .single()
 
   if (error) {

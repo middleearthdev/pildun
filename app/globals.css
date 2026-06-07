@@ -218,7 +218,8 @@ b { font-weight: 700; color: var(--text); }
 .pcard-name { font-weight: 700; font-size: 17px; letter-spacing: 0.2px; }
 .pcard-status { font-size: 13px; color: var(--muted); margin-top: 2px; font-weight: 500; }
 .pcard-status.live { color: var(--gold); font-weight: 700; }
-.pcard-country { display: flex; align-items: center; gap: 7px; margin-top: 3px; font-weight: 700; font-size: 15px; color: var(--text); }
+.pcard-countries { display: flex; flex-direction: column; gap: 2px; margin-top: 3px; }
+.pcard-country { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 15px; color: var(--text); }
 .pcard-flag { font-size: 20px; }
 .lock-ico { font-size: 12px; margin-left: 2px; opacity: 0.8; }
 .pcard-arrow { font-size: 22px; color: var(--muted); font-weight: 700; flex: none; }
@@ -405,6 +406,8 @@ b { font-weight: 700; color: var(--text); }
 @keyframes wiggle { 0%,100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
 .big-flag { font-size: 64px; margin-bottom: 6px; }
 .locked-country { font-family: var(--display); font-size: 26px; color: var(--gold); margin: 14px 0; letter-spacing: 1px; }
+.locked-countries { display: flex; flex-direction: column; gap: 6px; margin: 14px 0; }
+.locked-countries .locked-country { margin: 0; font-size: 21px; }
 .field {
   width: 100%;
   margin-top: 20px;

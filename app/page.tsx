@@ -13,8 +13,9 @@ async function getData() {
   const [participantsRes, countriesRaw] = await Promise.all([
     supabase
       .from('participants')
-      .select('*, country:countries!country_id(*)')
-      .order('created_at', { ascending: true }),
+      .select('*, countries:countries!assigned_participant_id(*)')
+      .order('created_at', { ascending: true })
+      .order('assigned_at', { referencedTable: 'countries', ascending: true }),
     // Fetch countries via raw REST to bypass any client issue
     fetch(`${url}/rest/v1/countries?select=*&order=name`, {
       headers: {

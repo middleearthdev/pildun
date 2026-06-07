@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
 import { isDrawOpen } from '@/lib/draw-schedule'
+import { MAX_COUNTRIES_PER_PARTICIPANT } from '@/types'
 
 export async function POST(request: Request) {
   const supabase = createServerClient()
@@ -38,7 +39,10 @@ export async function POST(request: Request) {
 
   // Atomically assign a random country using the safe RPC function
   const { data: assignResult, error: rpcError } = await supabase
-    .rpc('assign_random_country', { p_participant_id: participantId })
+    .rpc('assign_random_country', {
+      p_participant_id: participantId,
+      p_max_countries: MAX_COUNTRIES_PER_PARTICIPANT,
+    })
 
   if (rpcError) {
     // Reset spinning state if failed
@@ -47,8 +51,8 @@ export async function POST(request: Request) {
       .update({ is_spinning: false, updated_at: new Date().toISOString() })
       .eq('id', participantId)
 
-    if (rpcError.message.includes('already has a country')) {
-      return NextResponse.json({ error: 'Peserta ini sudah mendapatkan negara' }, { status: 409 })
+    if (rpcError.message.includes('already has max countries') || rpcError.message.includes('already has a country')) {
+      return NextResponse.json({ error: 'Peserta ini sudah mendapatkan jatah negara maksimal' }, { status: 409 })
     }
     if (rpcError.message.includes('No countries available')) {
       return NextResponse.json({ error: 'Tidak ada negara yang tersisa' }, { status: 409 })

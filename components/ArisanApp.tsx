@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { SpinWheel } from './SpinWheel'
 import * as Confetti from '@/lib/confetti'
 import * as Sound from '@/lib/sounds'
-import { Participant, Country } from '@/types'
+import { Participant, Country, MAX_COUNTRIES_PER_PARTICIPANT } from '@/types'
 
 interface Props {
   initialParticipants: Participant[]
@@ -77,12 +77,14 @@ function LiveBar({ spinningName }: { spinningName: string | null }) {
 }
 
 // ---- Participant card ----
-function ParticipantCard({ p, country, isSpinning, onClick }: {
-  p: Participant; country: Country | null; isSpinning: boolean; onClick: () => void
+function ParticipantCard({ p, isSpinning, onClick }: {
+  p: Participant; isSpinning: boolean; onClick: () => void
 }) {
+  const countries = p.countries
+  const full = countries.length >= MAX_COUNTRIES_PER_PARTICIPANT
   return (
     <button
-      className={`pcard${isSpinning ? ' spinning' : ''}${country ? ' locked' : ''}`}
+      className={`pcard${isSpinning ? ' spinning' : ''}${full ? ' locked' : ''}`}
       onClick={onClick}
     >
       {isSpinning && <span className="live-tag">🎡 SEDANG MENGUNDI</span>}
@@ -91,17 +93,23 @@ function ParticipantCard({ p, country, isSpinning, onClick }: {
         <div className="pcard-name">{p.name}</div>
         {isSpinning ? (
           <div className="pcard-status live">🔥 Live draw berlangsung…</div>
-        ) : country ? (
-          <div className="pcard-country">
-            <span className="pcard-flag">{country.flag}</span>
-            <span>{country.name}</span>
-            <span className="lock-ico" title="Terkunci">🔒</span>
+        ) : countries.length > 0 ? (
+          <div className="pcard-countries">
+            {countries.map(c => (
+              <span key={c.id} className="pcard-country">
+                <span className="pcard-flag">{c.flag}</span>
+                <span>{c.name}</span>
+                {full && c.id === countries[countries.length - 1].id && (
+                  <span className="lock-ico" title="Terkunci">🔒</span>
+                )}
+              </span>
+            ))}
           </div>
         ) : (
           <div className="pcard-status">Belum diundi</div>
         )}
       </div>
-      <span className="pcard-arrow">{country ? '✓' : '›'}</span>
+      <span className="pcard-arrow">{full ? '✓' : '›'}</span>
     </button>
   )
 }
@@ -175,15 +183,21 @@ function CountriesModal({ countries, onClose }: { countries: Country[]; onClose:
   )
 }
 
-function LockedModal({ participant, country, onClose }: { participant: Participant; country: Country; onClose: () => void }) {
+function LockedModal({ participant, countries, onClose }: { participant: Participant; countries: Country[]; onClose: () => void }) {
   return (
     <Backdrop onClose={onClose}>
       <div className="modal center">
-        <div className="big-flag">{country.flag}</div>
+        <div className="big-flag">{countries.map(c => c.flag).join(' ')}</div>
         <div className="modal-kicker gold">NEGARA SUDAH TERKUNCI 🔒</div>
         <h2 className="modal-title">{participant.name} sudah dapat</h2>
-        <div className="locked-country">{country.flag} {country.name}</div>
-        <p className="modal-sub">Setiap peserta hanya bisa mengundi satu kali. Negara tidak bisa diganti.</p>
+        <div className="locked-countries">
+          {countries.map(c => (
+            <div key={c.id} className="locked-country">{c.flag} {c.name}</div>
+          ))}
+        </div>
+        <p className="modal-sub">
+          Setiap peserta cuma bisa mengundi {MAX_COUNTRIES_PER_PARTICIPANT}x. Negara tidak bisa diganti.
+        </p>
         <div className="modal-actions single">
           <button className="btn primary" onClick={onClose}>Mengerti</button>
         </div>
@@ -195,12 +209,18 @@ function LockedModal({ participant, country, onClose }: { participant: Participa
 function ConfirmSpinModal({ participant, remaining, onConfirm, onClose }: {
   participant: Participant; remaining: number; onConfirm: () => void; onClose: () => void
 }) {
+  const already = participant.countries
   return (
     <Backdrop onClose={onClose}>
       <div className="modal center">
         <div className="modal-emoji">🔥</div>
         <div className="modal-kicker">SIAP MENGUNDI?</div>
         <h2 className="modal-title">{participant.name}, giliranmu!</h2>
+        {already.length > 0 && (
+          <p className="modal-sub">
+            Sudah punya {already.map(c => `${c.flag} ${c.name}`).join(', ')} — ini undian ke-{already.length + 1}.
+          </p>
+        )}
         <p className="modal-sub">
           Begitu tombol spin ditekan, negara yang keluar <b>langsung jadi milikmu</b> dan
           tidak bisa diganti. Tersisa <b>{remaining} negara</b> di putaran.
@@ -249,7 +269,7 @@ type ToastState =
 type ModalState =
   | { type: 'add' }
   | { type: 'confirm'; p: Participant }
-  | { type: 'locked'; p: Participant; country: Country }
+  | { type: 'locked'; p: Participant }
   | { type: 'countries' }
   | null
 
@@ -282,13 +302,8 @@ export function ArisanApp({ initialParticipants, initialCountries, drawStartAt }
   }, [startAt])
   const drawStarted = !startAt || now.getTime() >= startAt.getTime()
 
-  const byId = useMemo(
-    () => Object.fromEntries(countries.map(c => [c.id, c])),
-    [countries]
-  )
-
   const assignedIds = useMemo(
-    () => new Set(participants.filter(p => p.country_id).map(p => p.country_id)),
+    () => new Set(participants.flatMap(p => p.countries.map(c => c.id))),
     [participants]
   )
 
@@ -309,10 +324,11 @@ export function ArisanApp({ initialParticipants, initialCountries, drawStartAt }
 
       // fire toast only when spin finishes (is_spinning: true → false), not when country first assigned
       next.forEach(np => {
-        if (np.country_id && !np.is_spinning && np.id !== activeId) {
+        if (!np.is_spinning && np.id !== activeId) {
           const old = prev.find(p => p.id === np.id)
-          if (old && old.is_spinning && np.country) {
-            flashToast({ kind: 'win', name: np.name, flag: np.country.flag, country: np.country.name }, 3600)
+          if (old && old.is_spinning && np.countries.length > old.countries.length) {
+            const won = np.countries[np.countries.length - 1]
+            flashToast({ kind: 'win', name: np.name, flag: won.flag, country: won.name }, 3600)
           }
         }
       })
@@ -339,11 +355,11 @@ export function ArisanApp({ initialParticipants, initialCountries, drawStartAt }
     return () => { supabase.removeChannel(channel) }
   }, [fetchParticipants])
 
-  // sort: spinning first → undrawn → drawn
+  // sort: spinning first → belum penuh jatah → sudah penuh jatah
   const ordered = useMemo(() => {
     const score = (p: Participant) => {
       if (p.is_spinning) return 0
-      if (!p.country_id) return 1
+      if (p.countries.length < MAX_COUNTRIES_PER_PARTICIPANT) return 1
       return 2
     }
     return [...participants].sort((a, b) => score(a) - score(b))
@@ -351,9 +367,8 @@ export function ArisanApp({ initialParticipants, initialCountries, drawStartAt }
 
   function onCardClick(p: Participant) {
     if (p.is_spinning) return
-    if (p.country_id) {
-      const c = (p.country || byId[p.country_id]) as Country | null
-      if (c) setModal({ type: 'locked', p, country: c })
+    if (p.countries.length >= MAX_COUNTRIES_PER_PARTICIPANT) {
+      setModal({ type: 'locked', p })
     } else if (spinningParticipant) {
       flashToast({ kind: 'wait', name: spinningParticipant.name }, 2200)
     } else {
@@ -444,7 +459,7 @@ export function ArisanApp({ initialParticipants, initialCountries, drawStartAt }
     setModal(null)
   }
 
-  const drawnCount = participants.filter(p => p.country_id).length
+  const drawnCount = participants.filter(p => p.countries.length > 0).length
 
   return (
     <div className="app">
@@ -474,7 +489,6 @@ export function ArisanApp({ initialParticipants, initialCountries, drawStartAt }
               <ParticipantCard
                 key={p.id}
                 p={p}
-                country={p.country_id ? ((p.country || byId[p.country_id]) as Country | null) : null}
                 isSpinning={p.is_spinning}
                 onClick={() => onCardClick(p)}
               />
@@ -551,7 +565,7 @@ export function ArisanApp({ initialParticipants, initialCountries, drawStartAt }
         <AddParticipantModal onAdd={addParticipant} onClose={() => setModal(null)} />
       )}
       {modal?.type === 'locked' && (
-        <LockedModal participant={modal.p} country={modal.country} onClose={() => setModal(null)} />
+        <LockedModal participant={modal.p} countries={modal.p.countries} onClose={() => setModal(null)} />
       )}
       {modal?.type === 'confirm' && (
         <ConfirmSpinModal
