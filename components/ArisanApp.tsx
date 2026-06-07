@@ -30,7 +30,7 @@ function PracticeBanner({ startAt }: { startAt: Date }) {
     <div className="practice-banner">
       <span className="practice-banner-icon">🛠️</span>
       <div>
-        <b>Mode latihan</b> — undian resmi mulai <b>{formatDrawStart(startAt)}</b>.
+        <b>Mode latihan</b> — undian negara Ke-2 resmi mulai lagi <b>{formatDrawStart(startAt)}</b>.
         Sebelum itu kamu boleh coba-coba putar rodanya, tapi negara yang keluar
         <b> tidak akan disimpan</b>.
       </div>
