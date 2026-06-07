@@ -1,4 +1,5 @@
 import { createServerClient } from '@/lib/supabase-server'
+import { getDrawStartAt } from '@/lib/draw-schedule'
 import { ArisanApp } from '@/components/ArisanApp'
 import { Participant, Country } from '@/types'
 
@@ -40,6 +41,7 @@ export default async function HomePage() {
     <ArisanApp
       initialParticipants={participants}
       initialCountries={countries}
+      drawStartAt={getDrawStartAt()?.toISOString() ?? null}
     />
   )
 }

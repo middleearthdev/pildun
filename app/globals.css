@@ -127,6 +127,33 @@ b { font-weight: 700; color: var(--text); }
 }
 .stat b { display: block; font-family: var(--display); font-size: 30px; color: var(--text); line-height: 1; }
 .stat span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+.stat.clickable { cursor: pointer; font-family: var(--ui); transition: transform .15s, border-color .2s, background .2s; }
+.stat.clickable:hover { border-color: var(--accent); background: rgba(56,189,248,0.08); }
+.stat.clickable:active { transform: scale(.97); }
+
+.countries-modal { max-width: 420px; }
+.country-list {
+  margin-top: 18px;
+  max-height: 360px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  text-align: left;
+}
+.country-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--line);
+  font-weight: 600;
+  font-size: 14px;
+}
+.country-flag { font-size: 19px; flex: none; }
+.country-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ===================== PARTICIPANT LIST ===================== */
 .plist { display: flex; flex-direction: column; gap: 11px; margin-top: 30px; }
@@ -473,6 +500,30 @@ b { font-weight: 700; color: var(--text); }
   text-shadow: 0 0 50px color-mix(in srgb,var(--accent) 50%, transparent);
   margin-bottom: 26px;
 }
+.win-practice-note {
+  max-width: 320px;
+  margin: 4px 0 22px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.practice-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  text-align: left;
+  margin: 16px auto 0;
+  max-width: 440px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+  background: color-mix(in srgb, var(--gold) 12%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--gold) 35%, var(--line));
+}
+.practice-banner-icon { font-size: 20px; flex: none; line-height: 1.4; }
 
 @media (max-width: 380px) {
   .stat b { font-size: 24px; }

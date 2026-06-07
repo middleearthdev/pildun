@@ -10,6 +10,32 @@ import { Participant, Country } from '@/types'
 interface Props {
   initialParticipants: Participant[]
   initialCountries: Country[]
+  drawStartAt: string | null
+}
+
+function formatDrawStart(date: Date) {
+  return date.toLocaleString('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  })
+}
+
+// ---- Practice-mode banner (shown before the official draw start time) ----
+function PracticeBanner({ startAt }: { startAt: Date }) {
+  return (
+    <div className="practice-banner">
+      <span className="practice-banner-icon">🛠️</span>
+      <div>
+        <b>Mode latihan</b> — undian resmi mulai <b>{formatDrawStart(startAt)}</b>.
+        Sebelum itu kamu boleh coba-coba putar rodanya, tapi negara yang keluar
+        <b> tidak akan disimpan</b>.
+      </div>
+    </div>
+  )
 }
 
 // ---- Avatar with initials ----
@@ -126,6 +152,29 @@ function AddParticipantModal({ onAdd, onClose }: { onAdd: (name: string) => void
   )
 }
 
+function CountriesModal({ countries, onClose }: { countries: Country[]; onClose: () => void }) {
+  return (
+    <Backdrop onClose={onClose}>
+      <div className="modal countries-modal">
+        <div className="modal-kicker">BELUM DIUNDI</div>
+        <h2 className="modal-title">Negara Tersisa</h2>
+        <p className="modal-sub">{countries.length} negara masih menunggu untuk diundi.</p>
+        <div className="country-list">
+          {countries.map(c => (
+            <div key={c.id} className="country-item">
+              <span className="country-flag">{c.flag}</span>
+              <span className="country-name">{c.name}</span>
+            </div>
+          ))}
+        </div>
+        <div className="modal-actions single">
+          <button className="btn primary" onClick={onClose}>Tutup</button>
+        </div>
+      </div>
+    </Backdrop>
+  )
+}
+
 function LockedModal({ participant, country, onClose }: { participant: Participant; country: Country; onClose: () => void }) {
   return (
     <Backdrop onClose={onClose}>
@@ -165,7 +214,7 @@ function ConfirmSpinModal({ participant, remaining, onConfirm, onClose }: {
   )
 }
 
-function WinModal({ participant, country, onClose }: { participant: Participant; country: Country; onClose: () => void }) {
+function WinModal({ participant, country, practice, onClose }: { participant: Participant; country: Country; practice: boolean; onClose: () => void }) {
   const [show, setShow] = useState(false)
   useEffect(() => {
     const t = setTimeout(() => setShow(true), 30)
@@ -175,10 +224,15 @@ function WinModal({ participant, country, onClose }: { participant: Participant;
     <div className="winscreen">
       <div className="win-rays" />
       <div className={`win-inner${show ? ' in' : ''}`}>
-        <div className="win-kicker">🎉 SELAMAT 🎉</div>
+        <div className="win-kicker">{practice ? '🛠️ LATIHAN 🛠️' : '🎉 SELAMAT 🎉'}</div>
         <div className="win-name">{participant.name} mendapatkan</div>
         <div className="win-flag">{country.flag}</div>
         <div className="win-country">{country.name.toUpperCase()}</div>
+        {practice && (
+          <p className="win-practice-note">
+            Ini cuma percobaan — hasilnya <b>tidak disimpan</b>. Saat undian resmi dimulai, coba lagi ya!
+          </p>
+        )}
         <button className="btn primary big" onClick={onClose}>Lanjut →</button>
       </div>
     </div>
@@ -196,18 +250,19 @@ type ModalState =
   | { type: 'add' }
   | { type: 'confirm'; p: Participant }
   | { type: 'locked'; p: Participant; country: Country }
+  | { type: 'countries' }
   | null
 
 const SPIN_SECONDS = 7.5
 const SPIN_TURNS = 9
 
-export function ArisanApp({ initialParticipants, initialCountries }: Props) {
+export function ArisanApp({ initialParticipants, initialCountries, drawStartAt }: Props) {
   const [participants, setParticipants] = useState<Participant[]>(initialParticipants)
   const [countries] = useState<Country[]>(initialCountries)
   const [view, setView] = useState<'list' | 'spin'>('list')
   const [activeId, setActiveId] = useState<string | null>(null)
   const [modal, setModal] = useState<ModalState>(null)
-  const [win, setWin] = useState<{ participant: Participant; country: Country } | null>(null)
+  const [win, setWin] = useState<{ participant: Participant; country: Country; practice: boolean } | null>(null)
   const [spinPool, setSpinPool] = useState<Country[]>([])
   const [rotation, setRotation] = useState(0)
   const [spinning, setSpinning] = useState(false)
@@ -215,6 +270,17 @@ export function ArisanApp({ initialParticipants, initialCountries }: Props) {
   const rotationRef = useRef(0)
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevParticipantsRef = useRef<Participant[]>(initialParticipants)
+
+  // ---- Draw schedule: keep "now" fresh so the practice banner clears itself
+  // automatically the moment the official draw time arrives ----
+  const startAt = useMemo(() => (drawStartAt ? new Date(drawStartAt) : null), [drawStartAt])
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    if (!startAt) return
+    const id = setInterval(() => setNow(new Date()), 30_000)
+    return () => clearInterval(id)
+  }, [startAt])
+  const drawStarted = !startAt || now.getTime() >= startAt.getTime()
 
   const byId = useMemo(
     () => Object.fromEntries(countries.map(c => [c.id, c])),
@@ -319,6 +385,7 @@ export function ArisanApp({ initialParticipants, initialCountries }: Props) {
     if (!res.ok) { alert(data.error || 'Terjadi kesalahan'); return }
 
     const winner: Country = data.country
+    const practice: boolean = !!data.practice
     const idx = spinPool.findIndex(c => c.id === winner.id)
     const safeIdx = idx >= 0 ? idx : Math.floor(Math.random() * n)
     const center = safeIdx * seg + seg / 2
@@ -346,13 +413,17 @@ export function ArisanApp({ initialParticipants, initialCountries }: Props) {
         ],
       })
       Sound.playWin()
-      setWin({ participant: active, country: winner })
+      setWin({ participant: active, country: winner, practice })
       setSpinning(false)
-      await fetch('/api/draw/finish', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ participantId: activeId }),
-      })
+      // Mode latihan: tidak ada apa pun yang disimpan di server, jadi tidak
+      // perlu (dan tidak boleh) memanggil endpoint finish.
+      if (!practice) {
+        await fetch('/api/draw/finish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ participantId: activeId }),
+        })
+      }
     }, SPIN_SECONDS * 1000 + 250)
   }
 
@@ -387,11 +458,14 @@ export function ArisanApp({ initialParticipants, initialCountries }: Props) {
             </div>
             <h1 className="hero-title">ARISAN<br /><span>PIALA DUNIA</span></h1>
             <p className="hero-sub">Pilih peserta lalu undi negara secara realtime.</p>
+            {!drawStarted && startAt && <PracticeBanner startAt={startAt} />}
             <LiveBar spinningName={spinningParticipant?.name ?? null} />
             <div className="stats">
               <div className="stat"><b>{participants.length}</b><span>Peserta</span></div>
               <div className="stat"><b>{drawnCount}</b><span>Sudah diundi</span></div>
-              <div className="stat"><b>{available.length}</b><span>Negara tersisa</span></div>
+              <button className="stat clickable" onClick={() => setModal({ type: 'countries' })}>
+                <b>{available.length}</b><span>Negara tersisa</span>
+              </button>
             </div>
           </header>
 
@@ -470,6 +544,9 @@ export function ArisanApp({ initialParticipants, initialCountries }: Props) {
       )}
 
       {/* ===== MODALS ===== */}
+      {modal?.type === 'countries' && (
+        <CountriesModal countries={available} onClose={() => setModal(null)} />
+      )}
       {modal?.type === 'add' && (
         <AddParticipantModal onAdd={addParticipant} onClose={() => setModal(null)} />
       )}
@@ -485,7 +562,7 @@ export function ArisanApp({ initialParticipants, initialCountries }: Props) {
         />
       )}
       {win && (
-        <WinModal participant={win.participant} country={win.country} onClose={closeWin} />
+        <WinModal participant={win.participant} country={win.country} practice={win.practice} onClose={closeWin} />
       )}
     </div>
   )

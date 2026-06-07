@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase-server'
+import { isDrawOpen } from '@/lib/draw-schedule'
 
 export async function POST(request: Request) {
   const supabase = createServerClient()
@@ -8,6 +9,25 @@ export async function POST(request: Request) {
 
   if (!participantId) {
     return NextResponse.json({ error: 'participantId wajib diisi' }, { status: 400 })
+  }
+
+  // Belum waktunya undian: jangan sentuh data sama sekali, cuma kasih
+  // negara acak dari yang masih tersedia supaya peserta bisa coba-coba spin.
+  if (!isDrawOpen()) {
+    const { data: pool, error: poolError } = await supabase
+      .from('countries')
+      .select('id, name, flag, code')
+      .eq('is_assigned', false)
+
+    if (poolError) {
+      return NextResponse.json({ error: poolError.message }, { status: 500 })
+    }
+    if (!pool || pool.length === 0) {
+      return NextResponse.json({ error: 'Tidak ada negara yang tersisa' }, { status: 409 })
+    }
+
+    const country = pool[Math.floor(Math.random() * pool.length)]
+    return NextResponse.json({ country, practice: true })
   }
 
   // Set participant as spinning
@@ -48,5 +68,6 @@ export async function POST(request: Request) {
       flag: assignedCountry.country_flag,
       code: assignedCountry.country_code,
     },
+    practice: false,
   })
 }
